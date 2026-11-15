@@ -9,10 +9,6 @@ from flask import (
     Flask, render_template, redirect, url_for,
     request, flash, jsonify, send_from_directory
 )
-from flask import (
-    Flask, render_template, redirect, url_for,
-    request, flash, jsonify
-)
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager, UserMixin, login_user,
@@ -30,12 +26,19 @@ app = Flask(__name__, instance_relative_config=True)
 app.config["SECRET_KEY"] = os.getenv(
     "SECRET_KEY", "dev-only-change-this-key"
 )
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-    "DATABASE_URL", "sqlite:///medicine.db"
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-# Medical records upload configuration
 
+# SQLite database path - use absolute path for deployment safety
+_database_url = os.getenv("DATABASE_URL", "sqlite:///medicine.db")
+if _database_url.startswith("sqlite:///") and not _database_url.startswith("sqlite:////"):
+    # Convert relative sqlite path to absolute instance path
+    _db_path = os.path.join(app.instance_path, _database_url.replace("sqlite:///", ""))
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{_db_path}"
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = _database_url
+
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Medical records upload configuration - ensure writable absolute path
 app.config["MEDICAL_RECORD_UPLOAD_FOLDER"] = os.path.join(
     app.instance_path, "medical_records"
 )
@@ -48,10 +51,29 @@ ALLOWED_MEDICAL_RECORD_EXTENSIONS = {
 
 os.makedirs(app.config["MEDICAL_RECORD_UPLOAD_FOLDER"], exist_ok=True)
 
+# VAPID keys - support both file path and direct key in env
+_vapid_private_key = os.getenv("VAPID_PRIVATE_KEY", "")
+_vapid_private_key_path = os.getenv("VAPID_PRIVATE_KEY_PATH", "")
+
+if _vapid_private_key:
+    # Write the key to a file in instance folder if provided directly
+    _key_file = os.path.join(app.instance_path, "vapid_private.pem")
+    try:
+        with open(_key_file, "w") as f:
+            f.write(_vapid_private_key)
+        app.config["VAPID_PRIVATE_KEY_PATH"] = _key_file
+    except OSError:
+        app.config["VAPID_PRIVATE_KEY_PATH"] = _vapid_private_key_path
+else:
+    # Use path relative to app root if not absolute
+    if _vapid_private_key_path and not os.path.isabs(_vapid_private_key_path):
+        app.config["VAPID_PRIVATE_KEY_PATH"] = os.path.join(
+            app.root_path, _vapid_private_key_path
+        )
+    else:
+        app.config["VAPID_PRIVATE_KEY_PATH"] = _vapid_private_key_path
+
 app.config["VAPID_PUBLIC_KEY"] = os.getenv("VAPID_PUBLIC_KEY", "")
-app.config["VAPID_PRIVATE_KEY_PATH"] = os.getenv(
-    "VAPID_PRIVATE_KEY_PATH", "vapid_private.pem"
-)
 app.config["VAPID_CLAIMS_EMAIL"] = os.getenv(
     "VAPID_CLAIMS_EMAIL", "mailto:your-email@example.com"
 )
@@ -2153,18 +2175,19 @@ with app.app_context():
 # =========================================================
 # RUN APPLICATION + BACKGROUND SCHEDULER
 # =========================================================
-print("\n========== REGISTERED MEDICAL ROUTES ==========")
 
-for rule in app.url_map.iter_rules():
-    if "medical" in rule.endpoint.lower():
-        print(rule.endpoint, "---->", rule.rule)
+# Only run scheduler and debug mode when running via `flask run` or `python app.py`,
+# not under gunicorn (which uses multiple workers and would duplicate jobs).
+_scheduler = None
 
-print("================================================\n")
-if __name__ == "__main__":
-    scheduler = BackgroundScheduler()
+def _start_scheduler():
+    global _scheduler
+    if _scheduler is not None:
+        return
+    _scheduler = BackgroundScheduler()
 
     # Send medicine reminders every minute.
-    scheduler.add_job(
+    _scheduler.add_job(
         check_and_send_medicine_reminders,
         trigger="interval",
         minutes=1,
@@ -2174,7 +2197,7 @@ if __name__ == "__main__":
     )
 
     # Check for missed doses every minute.
-    scheduler.add_job(
+    _scheduler.add_job(
         check_all_users_for_missed_doses,
         trigger="interval",
         minutes=1,
@@ -2183,9 +2206,13 @@ if __name__ == "__main__":
         coalesce=True,
     )
 
-    scheduler.start()
+    _scheduler.start()
 
+
+if __name__ == "__main__":
+    _start_scheduler()
     try:
         app.run(debug=True, use_reloader=False)
     finally:
-        scheduler.shutdown(wait=False)
+        if _scheduler:
+            _scheduler.shutdown(wait=False)
