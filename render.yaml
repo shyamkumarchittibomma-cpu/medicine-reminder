@@ -1,0 +1,53 @@
+# Render declarative spec for Medicine Reminder AI
+# Apply with: render blueprint submit render.yaml
+# Or import from the Render dashboard: https://dashboard.render.com
+
+services:
+  - type: web
+    name: medicine-reminder-ai
+    region: oregon
+    env: python
+    plan: starter
+    
+    # Build & run commands are auto-detected from Procfile/gunicorn,
+    # but we make them explicit here:
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: |
+      gunicorn --config gunicorn.conf.py app:app
+    
+    # Git repo (auto-detected, but explicit is safer)
+    repo: https://github.com/shyamkumarchittibomma-cpu/medicine-reminder.git
+    branch: main
+    
+    # Health check — Render polls this to know when the app is live
+    healthCheckPath: /
+    
+    # Auto-deploy on push to main
+    autoDeploy: true
+    
+    # Environment variables — set these in the Render dashboard
+    # (secrets must be configured manually; they cannot be committed here)
+    envVars:
+      - key: SECRET_KEY
+        value: change-this-to-a-long-random-secret-before-deployment
+      - key: DATABASE_URL
+        value: sqlite:///medicine.db
+      - key: VAPID_PUBLIC_KEY
+        value: BBZrkgwuyXI7vLXH_0NU4PVxQONgXN4jTSiIo9_sbP2DdKt-zqLRLZKhjrqjqtbbVe1z0-A2H2hN3sW49VviBqA
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CLAIMS_EMAIL
+        value: mailto:shyamkumarchittibomma@gmail.com
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        value: "+17372508034"
+    
+    # Disk for SQLite database and medical record uploads
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
