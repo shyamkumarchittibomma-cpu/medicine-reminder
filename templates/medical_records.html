@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}My Medical Records | MediCare AI{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">🗂️ My Medical Records</h2>
+            <p class="text-muted mb-0">
+                Keep prescriptions, blood reports and lab reports in one private place.
+            </p>
+        </div>
+        <span class="badge text-bg-primary">{{ records|length }} record(s)</span>
+    </div>
+
+    <div class="alert alert-info">
+        <strong>Privacy:</strong> Uploaded files are linked to your account.
+        Only your logged-in account can view or download them.
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Upload a Medical Document</h5>
+        </div>
+
+        <div class="card-body">
+            <form method="POST"
+                  action="{{ url_for('medical_records') }}"
+                  enctype="multipart/form-data">
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="document">
+                            Choose document *
+                        </label>
+                        <input class="form-control"
+                               type="file"
+                               id="document"
+                               name="document"
+                               accept=".pdf,.png,.jpg,.jpeg,.webp"
+                               required>
+                        <div class="form-text">
+                            PDF, PNG, JPG, JPEG or WEBP. Maximum 10 MB.
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="title">
+                            Document title
+                        </label>
+                        <input class="form-control"
+                               type="text"
+                               id="title"
+                               name="title"
+                               maxlength="150"
+                               placeholder="Example: Monthly doctor prescription">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label" for="record_type">
+                            Document type *
+                        </label>
+                        <select class="form-select"
+                                id="record_type"
+                                name="record_type"
+                                required>
+                            <option value="">Select type</option>
+                            <option value="prescription">Prescription</option>
+                            <option value="blood_report">Blood Report</option>
+                            <option value="lab_report">Lab Report</option>
+                            <option value="other">Other Medical Record</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label" for="consultation_date">
+                            Consultation / Report Date *
+                        </label>
+                        <input class="form-control"
+                               type="date"
+                               id="consultation_date"
+                               name="consultation_date"
+                               value="{{ today }}"
+                               required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label" for="next_consultation_date">
+                            Next Consultation Date
+                        </label>
+                        <input class="form-control"
+                               type="date"
+                               id="next_consultation_date"
+                               name="next_consultation_date">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="doctor_name">
+                            Doctor Name
+                        </label>
+                        <input class="form-control"
+                               type="text"
+                               id="doctor_name"
+                               name="doctor_name"
+                               maxlength="120"
+                               placeholder="Doctor's name">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="hospital_name">
+                            Hospital / Clinic
+                        </label>
+                        <input class="form-control"
+                               type="text"
+                               id="hospital_name"
+                               name="hospital_name"
+                               maxlength="150"
+                               placeholder="Hospital or clinic name">
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label" for="notes">Notes</label>
+                        <textarea class="form-control"
+                                  id="notes"
+                                  name="notes"
+                                  rows="3"
+                                  placeholder="Optional notes from your consultation"></textarea>
+                    </div>
+
+                    <div class="col-12">
+                        <button class="btn btn-primary" type="submit">
+                            ⬆ Upload Medical Record
+                        </button>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if upcoming_records %}
+    <div class="card border-warning shadow-sm mb-4">
+        <div class="card-header bg-warning-subtle">
+            <h5 class="mb-0">📅 Upcoming Consultations</h5>
+        </div>
+
+        <div class="card-body">
+            {% for record in upcoming_records %}
+            <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom py-2">
+                <div>
+                    <strong>{{ record.doctor_name or "Doctor not specified" }}</strong>
+                    <div class="small text-muted">
+                        {{ record.hospital_name or "Hospital not specified" }}
+                    </div>
+                    <div class="small">{{ record.title }}</div>
+                </div>
+
+                <span class="badge text-bg-warning">
+                    {{ record.next_consultation_date }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Previous Medical Records</h4>
+    </div>
+
+    {% if records %}
+    <div class="row g-3">
+
+        {% for record in records %}
+        <div class="col-md-6 col-lg-4">
+
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <h5 class="card-title mb-0">{{ record.title }}</h5>
+
+                        {% if record.record_type == "prescription" %}
+                            <span class="badge text-bg-primary">Prescription</span>
+                        {% elif record.record_type == "blood_report" %}
+                            <span class="badge text-bg-danger">Blood Report</span>
+                        {% elif record.record_type == "lab_report" %}
+                            <span class="badge text-bg-info">Lab Report</span>
+                        {% else %}
+                            <span class="badge text-bg-secondary">Other</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="small text-muted mb-1">
+                        <strong>Date:</strong> {{ record.consultation_date }}
+                    </p>
+
+                    <p class="small text-muted mb-1">
+                        <strong>Doctor:</strong>
+                        {{ record.doctor_name or "Not provided" }}
+                    </p>
+
+                    <p class="small text-muted mb-1">
+                        <strong>Hospital:</strong>
+                        {{ record.hospital_name or "Not provided" }}
+                    </p>
+
+                    {% if record.next_consultation_date %}
+                    <p class="small text-muted mb-1">
+                        <strong>Next visit:</strong> {{ record.next_consultation_date }}
+                    </p>
+                    {% endif %}
+
+                    {% if record.notes %}
+                    <p class="small mt-2 mb-2">{{ record.notes }}</p>
+                    {% endif %}
+
+                    <p class="small text-muted text-truncate mb-3"
+                       title="{{ record.original_filename }}">
+                        {{ record.original_filename }}
+                    </p>
+
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-outline-primary btn-sm flex-grow-1"
+                           href="{{ url_for('download_medical_record', record_id=record.id) }}">
+                            ⬇ Download
+                        </a>
+
+                        <form method="POST"
+                              action="{{ url_for('delete_medical_record', record_id=record.id) }}"
+                              onsubmit="return confirm('Delete this medical record permanently?');">
+
+                            <button class="btn btn-outline-danger btn-sm" type="submit">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+
+    </div>
+
+    {% else %}
+    <div class="card border-0 bg-light">
+        <div class="card-body text-center py-5">
+            <div class="display-5 mb-2">📁</div>
+            <h5>No medical records uploaded yet</h5>
+            <p class="text-muted mb-0">
+                Upload your first prescription or report using the form above.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Medicines | MediCare AI{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold">💊 Manage Medicines</h2>
+            <p class="text-secondary mb-0">
+                Manage medicines, daily timings and medicine stock.
+            </p>
+        </div>
+
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+            ← Dashboard
+        </a>
+    </div>
+
+    <!-- ADD MEDICINE -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5 class="fw-bold mb-3">Add a Medicine</h5>
+
+            <form method="POST" action="{{ url_for('medicines') }}">
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <label for="name" class="form-label">
+                            Medicine Name
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               id="name"
+                               name="name"
+                               maxlength="120"
+                               required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="dosage" class="form-label">
+                            Dosage
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               id="dosage"
+                               name="dosage"
+                               placeholder="Example: 1 tablet / 500 mg"
+                               maxlength="100"
+                               required>
+                    </div>
+
+                    <!-- INITIAL STOCK -->
+                    <div class="col-md-6">
+                        <label for="stock_quantity" class="form-label">
+                            Initial Stock (Tablets/Capsules)
+                        </label>
+
+                        <input type="number"
+                               class="form-control"
+                               id="stock_quantity"
+                               name="stock_quantity"
+                               min="0"
+                               value="0"
+                               required>
+
+                        <div class="form-text">
+                            Enter the total number of tablets or capsules available.
+                        </div>
+                    </div>
+
+                    <!-- SCHEDULED TIMES -->
+                    <div class="col-12">
+                        <label class="form-label">Scheduled Times</label>
+
+                        <div id="time-inputs">
+                            <div class="d-flex gap-2 mb-2 time-row">
+
+                                <input type="time"
+                                       class="form-control"
+                                       name="scheduled_times"
+                                       required>
+
+                                <button type="button"
+                                        class="btn btn-outline-danger remove-time"
+                                        disabled>
+                                    Remove
+                                </button>
+
+                            </div>
+                        </div>
+
+                        <button type="button"
+                                id="add-time"
+                                class="btn btn-outline-primary btn-sm">
+                            + Add Another Time
+                        </button>
+
+                        <div class="form-text">
+                            Example: 08:00 AM, 02:00 PM and 08:00 PM.
+                        </div>
+                    </div>
+
+                    <!-- INSTRUCTIONS -->
+                    <div class="col-12">
+                        <label for="instructions" class="form-label">
+                            Instructions (Optional)
+                        </label>
+
+                        <textarea class="form-control"
+                                  id="instructions"
+                                  name="instructions"
+                                  maxlength="300"
+                                  rows="2"
+                                  placeholder="Example: Take after food"></textarea>
+                    </div>
+
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            Save Medicine
+                        </button>
+                    </div>
+
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+
+    <!-- ACTIVE MEDICINES -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <h5 class="fw-bold mb-3">Your Active Medicines</h5>
+
+            {% if medicines %}
+
+                {% for medicine in medicines %}
+
+                    <div class="border rounded p-3 mb-3">
+
+                        <div class="d-flex flex-wrap justify-content-between gap-3">
+
+                            <div class="flex-grow-1">
+
+                                <h5 class="mb-1">
+                                    {{ medicine.name }}
+                                </h5>
+
+                                <p class="text-secondary mb-2">
+                                    Dosage: {{ medicine.dosage }}
+                                </p>
+
+                                <!-- STOCK DISPLAY -->
+                                <div class="mb-3">
+
+                                    <strong>Available Stock:</strong>
+
+                                    {% if medicine.stock_quantity <= 5 %}
+                                        <span class="badge text-bg-danger ms-1">
+                                            {{ medicine.stock_quantity }} tablets left
+                                        </span>
+
+                                        <div class="text-danger small mt-1">
+                                            ⚠️ Low stock! Please refill your medicine.
+                                        </div>
+                                    {% else %}
+                                        <span class="badge text-bg-success ms-1">
+                                            {{ medicine.stock_quantity }} tablets
+                                        </span>
+                                    {% endif %}
+
+                                </div>
+
+                                <!-- REFILL FORM -->
+                                <form method="POST"
+                                      action="{{ url_for('refill_medicine', medicine_id=medicine.id) }}"
+                                      class="row g-2 align-items-end mb-3">
+
+                                    <div class="col-sm-5 col-md-4">
+
+                                        <label class="form-label small">
+                                            Refill Quantity
+                                        </label>
+
+                                        <input type="number"
+                                               name="refill_amount"
+                                               class="form-control form-control-sm"
+                                               min="1"
+                                               placeholder="Enter quantity"
+                                               required>
+
+                                    </div>
+
+                                    <div class="col-auto">
+
+                                        <button type="submit"
+                                                class="btn btn-success btn-sm">
+                                            + Refill Stock
+                                        </button>
+
+                                    </div>
+
+                                </form>
+
+
+                                <!-- SCHEDULED TIMES -->
+                                <p class="mb-2">
+
+                                    <strong>Scheduled Times:</strong><br>
+
+                                    {% for schedule in medicine.schedule_list %}
+
+                                        <span class="badge text-bg-primary me-1 mt-1">
+                                            {{ schedule.scheduled_time|time12 }}
+                                        </span>
+
+                                    {% endfor %}
+
+                                </p>
+
+
+                                <!-- INSTRUCTIONS -->
+                                {% if medicine.instructions %}
+
+                                    <small class="text-secondary">
+                                        {{ medicine.instructions }}
+                                    </small>
+
+                                {% endif %}
+
+                            </div>
+
+
+                            <!-- REMOVE MEDICINE -->
+                            <div>
+
+                                <form method="POST"
+                                      action="{{ url_for('delete_medicine', medicine_id=medicine.id) }}"
+                                      onsubmit="return confirm('Remove this medicine from your active schedule?');">
+
+                                    <button type="submit"
+                                            class="btn btn-outline-danger btn-sm">
+                                        Remove Medicine
+                                    </button>
+
+                                </form>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                {% endfor %}
+
+            {% else %}
+
+                <div class="text-center py-4">
+
+                    <h5>No medicines added yet.</h5>
+
+                    <p class="text-secondary">
+                        Add your first medicine using the form above.
+                    </p>
+
+                </div>
+
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ADD / REMOVE SCHEDULED TIMES -->
+<script>
+
+const addTimeButton = document.getElementById("add-time");
+const timeInputs = document.getElementById("time-inputs");
+
+addTimeButton.addEventListener("click", function () {
+
+    const row = document.createElement("div");
+    row.className = "d-flex gap-2 mb-2 time-row";
+
+    const input = document.createElement("input");
+
+    input.type = "time";
+    input.name = "scheduled_times";
+    input.className = "form-control";
+    input.required = true;
+
+    const removeButton = document.createElement("button");
+
+    removeButton.type = "button";
+    removeButton.className = "btn btn-outline-danger remove-time";
+    removeButton.textContent = "Remove";
+
+    row.appendChild(input);
+    row.appendChild(removeButton);
+
+    timeInputs.appendChild(row);
+
+    updateRemoveButtons();
+
+});
+
+
+timeInputs.addEventListener("click", function (event) {
+
+    if (event.target.classList.contains("remove-time")) {
+
+        event.target.closest(".time-row").remove();
+
+        updateRemoveButtons();
+
+    }
+
+});
+
+
+function updateRemoveButtons() {
+
+    const buttons = document.querySelectorAll(".remove-time");
+
+    buttons.forEach(function (button) {
+
+        button.disabled = buttons.length === 1;
+
+    });
+
+}
+
+</script>
+
+{% endblock %}

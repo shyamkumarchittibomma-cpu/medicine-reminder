@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Register | MediCare AI{% endblock %}
+
+{% block content %}
+
+<div class="auth-container">
+    <div class="auth-card">
+
+        <div class="text-center mb-4">
+            <div class="brand-icon">🩺</div>
+            <h2 class="fw-bold mt-3">Create Account</h2>
+            <p class="text-secondary">
+                Start managing your medication schedule.
+            </p>
+        </div>
+
+        <form method="POST" action="{{ url_for('register') }}">
+
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input
+                    type="text"
+                    name="name"
+                    class="form-control"
+                    placeholder="Enter your full name"
+                    maxlength="100"
+                    autocomplete="name"
+                    required
+                >
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Email Address</label>
+                <input
+                    type="email"
+                    name="email"
+                    class="form-control"
+                    placeholder="Enter your email"
+                    maxlength="120"
+                    autocomplete="email"
+                    required
+                >
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label">Password</label>
+                <input
+                    type="password"
+                    name="password"
+                    class="form-control"
+                    placeholder="Minimum 8 characters"
+                    minlength="8"
+                    autocomplete="new-password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2">
+                Create Account
+            </button>
+
+        </form>
+
+        <p class="text-center mt-4 mb-0">
+            Already registered?
+            <a href="{{ url_for('login') }}">Login</a>
+        </p>
+
+    </div>
+</div>
+
+{% endblock %}

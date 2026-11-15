@@ -1,0 +1,242 @@
+
+{% extends "base.html" %}
+
+{% block title %}Medicine History | MediCare AI{% endblock %}
+
+{% block content %}
+
+<div class="container py-3">
+
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">📋 Medicine History</h2>
+            <p class="text-secondary mb-0">
+                Track each scheduled dose separately.
+            </p>
+        </div>
+
+        <a href="{{ url_for('dashboard') }}"
+           class="btn btn-outline-primary">
+            ← Dashboard
+        </a>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-secondary mb-1">Total Records</p>
+                    <h3 class="fw-bold">{{ total_count }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-secondary mb-1">Taken</p>
+                    <h3 class="fw-bold text-success">{{ taken_count }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-secondary mb-1">Missed</p>
+                    <h3 class="fw-bold text-danger">{{ missed_count }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-secondary mb-1">Snoozed</p>
+                    <h3 class="fw-bold text-warning">{{ snoozed_count }}</h3>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- History Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5 class="fw-bold mb-3">Filter History</h5>
+
+            <form method="GET"
+                  action="{{ url_for('medicine_history') }}">
+
+                <div class="row g-3 align-items-end">
+
+                    <div class="col-md-5">
+                        <label for="date" class="form-label">
+                            Select Date
+                        </label>
+
+                        <input
+                            type="date"
+                            id="date"
+                            name="date"
+                            class="form-control"
+                            value="{{ selected_date }}"
+                        >
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="status" class="form-label">
+                            Dose Status
+                        </label>
+
+                        <select
+                            id="status"
+                            name="status"
+                            class="form-select"
+                        >
+                            <option value="">All Statuses</option>
+
+                            {% for status in ['taken', 'missed', 'snoozed', 'pending'] %}
+                                <option
+                                    value="{{ status }}"
+                                    {% if selected_status == status %}selected{% endif %}
+                                >
+                                    {{ status|title }}
+                                </option>
+                            {% endfor %}
+
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            Apply
+                        </button>
+
+                        <a href="{{ url_for('medicine_history') }}"
+                           class="btn btn-outline-secondary">
+                            Reset
+                        </a>
+                    </div>
+
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+    <!-- History Records -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <h5 class="fw-bold mb-3">History Records</h5>
+
+            {% if history %}
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+
+                        <thead class="table-light">
+                            <tr>
+                                <th>Medicine</th>
+                                <th>Dosage</th>
+                                <th>Scheduled Date</th>
+                                <th>Scheduled Time</th>
+                                <th>Status</th>
+                                <th>Response Time</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            {% for log in history %}
+
+                                <tr>
+                                    <td class="fw-semibold">
+                                        {{ log.schedule.medicine.name }}
+                                    </td>
+
+                                    <td>
+                                        {{ log.schedule.medicine.dosage }}
+                                    </td>
+
+                                    <td>
+                                        {{ log.scheduled_date }}
+                                    </td>
+
+                                    <td>
+                                        {{ log.schedule.scheduled_time|time12 }}
+                                    </td>
+
+                                    <td>
+
+                                        {% if log.status == "taken" %}
+                                            <span class="badge bg-success">
+                                                ✓ Taken
+                                            </span>
+
+                                        {% elif log.status == "missed" %}
+                                            <span class="badge bg-danger">
+                                                ✕ Missed
+                                            </span>
+
+                                        {% elif log.status == "snoozed" %}
+                                            <span class="badge bg-warning text-dark">
+                                                ⏰ Snoozed
+                                            </span>
+
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                {{ log.status|title }}
+                                            </span>
+                                        {% endif %}
+
+                                    </td>
+
+                                    <td>
+                                        {% if log.response_time %}
+                                            {{ log.response_time.strftime('%d-%m-%Y %I:%M %p') }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+
+                                </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+                </div>
+
+            {% else %}
+
+                <div class="text-center py-5">
+                    <div class="display-4 mb-3">📭</div>
+
+                    <h5>No history records found</h5>
+
+                    <p class="text-secondary">
+                        No recorded medicine doses were found for this date and status.
+                    </p>
+
+                    <a href="{{ url_for('medicine_history') }}"
+                       class="btn btn-outline-primary">
+                        Clear Filters
+                    </a>
+                </div>
+
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

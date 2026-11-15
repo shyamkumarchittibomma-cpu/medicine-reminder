@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics | MediCare AI{% endblock %}
+
+{% block content %}
+
+<div class="container py-3">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h2 class="fw-bold">📊 Analytics Dashboard</h2>
+            <p class="text-secondary mb-0">
+                Your medicine dose adherence overview.
+            </p>
+        </div>
+
+        <a href="{{ url_for('dashboard') }}"
+           class="btn btn-outline-primary">
+            ← Dashboard
+        </a>
+    </div>
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-secondary">7-Day Adherence</p>
+                    <h2 class="fw-bold text-primary">{{ adherence }}%</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-secondary">Taken</p>
+                    <h2 class="fw-bold text-success">{{ taken_count }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-secondary">Missed</p>
+                    <h2 class="fw-bold text-danger">{{ missed_count }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-secondary">Snoozed</p>
+                    <h2 class="fw-bold text-warning">{{ snoozed_count }}</h2>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="fw-bold mb-3">Weekly Dose Responses</h5>
+
+            <div style="position:relative; height:320px;">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-3">
+                        Dose Status Distribution
+                    </h5>
+
+                    <div style="position:relative; height:300px;">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-3">Current Month Summary</h5>
+
+                    <h1 class="text-primary fw-bold">
+                        {{ monthly_adherence }}%
+                    </h1>
+
+                    <p class="text-secondary">
+                        Taken doses divided by recorded responses this month.
+                    </p>
+
+                    <hr>
+
+                    <p class="text-success fw-bold">
+                        Taken: {{ month_taken }}
+                    </p>
+
+                    <p class="text-danger fw-bold">
+                        Missed: {{ month_missed }}
+                    </p>
+
+                    <p class="text-warning fw-bold">
+                        Snoozed: {{ month_snoozed }}
+                    </p>
+
+                    <p class="fw-bold">
+                        Total recorded responses: {{ month_total }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <h5 class="fw-bold mb-3">
+                Medicine-wise Report — Last 7 Days
+            </h5>
+
+            {% if medicine_stats %}
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+
+                        <thead class="table-light">
+                            <tr>
+                                <th>Medicine</th>
+                                <th>Taken</th>
+                                <th>Missed</th>
+                                <th>Recorded Doses</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for item in medicine_stats %}
+                                <tr>
+                                    <td class="fw-semibold">{{ item.name }}</td>
+                                    <td class="text-success">{{ item.taken }}</td>
+                                    <td class="text-danger">{{ item.missed }}</td>
+                                    <td>{{ item.total }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+
+                    </table>
+                </div>
+
+            {% else %}
+
+                <p class="text-secondary mb-0">
+                    No medicine records available yet.
+                </p>
+
+            {% endif %}
+
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-4">
+        <strong>Note:</strong>
+        Missed-dose detection runs when you visit relevant app pages.
+        It is not a background scheduler. Analytics are based on recorded doses.
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const weeklyLabels = {{ weekly_labels | tojson }};
+const weeklyTaken = {{ weekly_taken | tojson }};
+const weeklyMissed = {{ weekly_missed | tojson }};
+const weeklySnoozed = {{ weekly_snoozed | tojson }};
+
+new Chart(document.getElementById("weeklyChart"), {
+    type: "bar",
+    data: {
+        labels: weeklyLabels,
+        datasets: [
+            {
+                label: "Taken",
+                data: weeklyTaken,
+                backgroundColor: "#198754"
+            },
+            {
+                label: "Missed",
+                data: weeklyMissed,
+                backgroundColor: "#dc3545"
+            },
+            {
+                label: "Snoozed",
+                data: weeklySnoozed,
+                backgroundColor: "#ffc107"
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { precision: 0 }
+            }
+        },
+        plugins: {
+            legend: { position: "bottom" }
+        }
+    }
+});
+
+new Chart(document.getElementById("statusChart"), {
+    type: "doughnut",
+    data: {
+        labels: ["Taken", "Missed", "Snoozed"],
+        datasets: [{
+            data: [
+                {{ taken_count }},
+                {{ missed_count }},
+                {{ snoozed_count }}
+            ],
+            backgroundColor: [
+                "#198754",
+                "#dc3545",
+                "#ffc107"
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: "bottom" }
+        }
+    }
+});
+</script>
+
+{% endblock %}

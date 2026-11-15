@@ -1,0 +1,1250 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | MediCare AI{% endblock %}
+
+{% block content %}
+
+<style>
+    .stat-card {
+        border: 0;
+        border-radius: 16px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+        height: 100%;
+        transition: transform 0.2s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+    }
+
+    .dashboard-card {
+        border: 0;
+        border-radius: 16px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+    }
+
+    .dashboard-card .card-header {
+        background: white;
+        padding: 18px 22px;
+    }
+
+    .progress {
+        border-radius: 10px;
+        background: #e9ecef;
+    }
+
+    .medicine-table th {
+        color: #64748b;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+
+    .medicine-table td {
+        vertical-align: middle;
+    }
+
+    .dashboard-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .dashboard-actions .btn {
+        border-radius: 10px;
+        font-weight: 600;
+        padding: 10px 14px;
+    }
+
+    /* Medicine alarm overlay */
+    #medicine-alarm-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: rgba(15, 23, 42, 0.78);
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    #medicine-alarm-overlay.show {
+        display: flex;
+    }
+
+    .medicine-alarm-card {
+        background: #fff;
+        width: 100%;
+        max-width: 430px;
+        border-radius: 22px;
+        padding: 28px;
+        text-align: center;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+        animation: alarmPop 0.25s ease-out;
+    }
+
+    .medicine-alarm-icon {
+        width: 86px;
+        height: 86px;
+        margin: 0 auto 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #dcfce7;
+        border-radius: 50%;
+        font-size: 43px;
+        animation: alarmPulse 1s infinite;
+    }
+
+    .medicine-alarm-card h3 {
+        font-weight: 800;
+        color: #172554;
+    }
+
+    .medicine-alarm-card .alarm-time {
+        color: #2563eb;
+        font-size: 21px;
+        font-weight: 750;
+    }
+
+    .medicine-alarm-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 22px;
+    }
+
+    .medicine-alarm-actions button {
+        padding: 12px 8px;
+        border: 0;
+        border-radius: 11px;
+        font-weight: 700;
+    }
+
+    #alarm-taken {
+        grid-column: 1 / -1;
+        background: #16a34a;
+        color: white;
+    }
+
+    #alarm-snooze {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    #alarm-dismiss {
+        background: #e2e8f0;
+        color: #334155;
+    }
+
+    .medicine-alarm-actions button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    @keyframes alarmPop {
+        from {
+            opacity: 0;
+            transform: scale(0.92);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    @keyframes alarmPulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.07);
+        }
+    }
+
+    @media (max-width: 576px) {
+        .dashboard-actions {
+            width: 100%;
+        }
+
+        .dashboard-actions .btn {
+            flex: 1;
+            font-size: 13px;
+        }
+    }
+</style>
+
+<div class="container py-4">
+
+    <!-- Dashboard Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+
+        <div>
+            <h2 class="fw-bold mb-1">
+                Welcome, {{ current_user.name }}!
+            </h2>
+
+            <p class="text-muted mb-0">
+                Your personal medication dashboard
+            </p>
+        </div>
+
+        <div class="dashboard-actions">
+
+            <button
+                type="button"
+                id="dashboard-enable-notifications"
+                class="btn btn-outline-primary">
+                🔔 Enable Notifications
+            </button>
+
+            <a
+                href="/risk-prediction"
+                class="btn btn-danger">
+                🤖 AI Risk Prediction
+            </a>
+
+        </div>
+
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+
+                <div class="alert
+                    {% if category == 'success' %}
+                        alert-success
+                    {% elif category == 'error' %}
+                        alert-danger
+                    {% else %}
+                        alert-info
+                    {% endif %}
+                    alert-dismissible fade show"
+                    role="alert">
+
+                    {{ message }}
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Close">
+                    </button>
+
+                </div>
+
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Statistics Cards -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card">
+                <div class="card-body p-4">
+                    <p class="text-muted mb-2">Scheduled Doses</p>
+                    <h2 class="fw-bold mb-0">{{ total }}</h2>
+                    <small class="text-muted">Today's schedule</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card">
+                <div class="card-body p-4">
+                    <p class="text-muted mb-2">Taken</p>
+                    <h2 class="fw-bold text-success mb-0">{{ taken }}</h2>
+                    <small class="text-muted">Doses completed</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card">
+                <div class="card-body p-4">
+                    <p class="text-muted mb-2">Missed</p>
+                    <h2 class="fw-bold text-danger mb-0">{{ missed }}</h2>
+                    <small class="text-muted">Doses missed</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card">
+                <div class="card-body p-4">
+                    <p class="text-muted mb-2">Today's Adherence</p>
+                    <h2 class="fw-bold text-primary mb-0">{{ adherence }}%</h2>
+                    <small class="text-muted">Daily completion</small>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Adherence Progress -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-body p-4">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">📊 Today's Progress</h5>
+
+                <span class="fw-bold text-success">
+                    {{ adherence }}%
+                </span>
+            </div>
+
+            <div
+                class="progress"
+                role="progressbar"
+                aria-label="Medication adherence"
+                aria-valuenow="{{ adherence }}"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                style="height: 12px;">
+
+                <div
+                    class="progress-bar bg-success"
+                    style="width: {{ adherence }}%;">
+                </div>
+            </div>
+
+            <p class="text-muted small mt-3 mb-0">
+                Track the medicines you have taken today.
+            </p>
+
+        </div>
+    </div>
+
+    <!-- STREAKS & BADGES -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-header">
+            <h4 class="fw-bold mb-0">🔥 Your Medication Streak</h4>
+        </div>
+
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <p class="text-muted mb-1">
+                        Complete all scheduled doses each day to build your streak.
+                    </p>
+
+                    {% if perfect_today %}
+                        <span class="badge bg-success">
+                            Today's doses completed ✓
+                        </span>
+                    {% else %}
+                        <span class="badge bg-info text-dark">
+                            Keep going to complete today's goal
+                        </span>
+                    {% endif %}
+                </div>
+
+                <div class="text-center">
+                    <h2 class="fw-bold text-success mb-0">
+                        {{ current_streak }} 🔥
+                    </h2>
+                    <small class="text-muted">Consecutive Days</small>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <h5 class="fw-bold mb-3">🏆 Achievement Badges</h5>
+
+            <div class="row g-3">
+
+                {% for level in [3, 7, 15, 30] %}
+
+                    <div class="col-6 col-md-3">
+
+                        <div class="border rounded-3 p-3 text-center h-100
+                            {% if level in earned_badges %}
+                                border-success bg-light
+                            {% endif %}">
+
+                            <div class="fs-2">
+                                {% if level == 3 %}
+                                    🥉
+                                {% elif level == 7 %}
+                                    🥈
+                                {% elif level == 15 %}
+                                    🥇
+                                {% else %}
+                                    🏆
+                                {% endif %}
+                            </div>
+
+                            <div class="fw-bold mt-2">
+                                {{ level }}-Day Streak
+                            </div>
+
+                            {% if level in earned_badges %}
+                                <span class="badge bg-success mt-2">
+                                    Unlocked ✓
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary mt-2">
+                                    Locked 🔒
+                                </span>
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+            {% if next_badge %}
+
+                <div class="mt-4">
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <strong>
+                            Next Badge: {{ next_badge }} Days
+                        </strong>
+
+                        <span>
+                            {{ current_streak }} / {{ next_badge }}
+                        </span>
+                    </div>
+
+                    <div class="progress" style="height: 12px;">
+
+                        <div
+                            class="progress-bar bg-success"
+                            role="progressbar"
+                            style="width: {{ badge_progress }}%;"
+                            aria-valuenow="{{ badge_progress }}"
+                            aria-valuemin="0"
+                            aria-valuemax="100">
+                        </div>
+
+                    </div>
+
+                </div>
+
+            {% else %}
+
+                <div class="alert alert-success mt-4 mb-0">
+                    🏆 Amazing! You have unlocked all streak badges.
+                </div>
+
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- AI RISK PREDICTION CARD -->
+    <div class="card dashboard-card mb-4">
+
+        <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+
+            <div>
+                <h4 class="fw-bold mb-1">
+                    🤖 AI Risk Prediction
+                </h4>
+
+                <p class="text-muted mb-0">
+                    Check your medication adherence risk and view your risk assessment.
+                </p>
+            </div>
+
+            <a
+                href="/risk-prediction"
+                class="btn btn-danger">
+                View Risk Prediction
+            </a>
+
+        </div>
+
+    </div>
+    <!-- MEDICAL RECORDS CARD -->
+<div class="card dashboard-card mb-4">
+    <div class="card-body p-4 d-flex flex-wrap
+                justify-content-between align-items-center gap-3">
+
+        <div>
+            <h4 class="fw-bold mb-1">
+                📁 Medical Records
+            </h4>
+
+            <p class="text-muted mb-0">
+                Upload and manage prescriptions, blood reports
+                and laboratory reports.
+            </p>
+        </div>
+
+        <a href="{{ url_for('medical_records') }}"
+           class="btn btn-primary">
+            View Medical Records
+        </a>
+
+    </div>
+</div>
+        <!-- Today's Medicines -->
+    <div class="card dashboard-card mb-4">
+
+        <div class="card-header">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+
+                <h4 class="fw-bold mb-0">
+                    💊 Today's Medicines
+                </h4>
+
+                <span class="badge bg-primary">
+                    {{ total }} Scheduled
+                </span>
+
+            </div>
+        </div>
+
+        <div class="card-body p-3">
+
+            {% if dose_items %}
+
+                <div class="table-responsive">
+
+                    <table class="table medicine-table align-middle">
+
+                        <thead>
+                            <tr>
+                                <th>Medicine</th>
+                                <th>Dosage</th>
+                                <th>Scheduled Time</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            {% for item in dose_items %}
+
+                                <tr>
+
+                                    <td>
+                                        <div class="fw-semibold">
+                                            {{ item.medicine.name }}
+                                        </div>
+
+                                        {% if item.medicine.instructions %}
+                                            <small class="text-muted">
+                                                {{ item.medicine.instructions }}
+                                            </small>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {{ item.medicine.dosage }}
+                                    </td>
+
+                                    <td class="text-nowrap">
+                                        {{ item.schedule.scheduled_time|time12 }}
+                                    </td>
+
+                                    <td>
+
+                                        {% if item.status == 'taken' %}
+
+                                            <span class="badge bg-success">
+                                                ✓ Taken
+                                            </span>
+
+                                        {% elif item.status == 'missed' %}
+
+                                            <span class="badge bg-danger">
+                                                ✗ Missed
+                                            </span>
+
+                                        {% elif item.status == 'snoozed' %}
+
+                                            <span class="badge bg-warning text-dark">
+                                                ⏰ Snoozed
+                                            </span>
+
+                                        {% else %}
+
+                                            <span class="badge bg-secondary">
+                                                Pending
+                                            </span>
+
+                                        {% endif %}
+
+                                    </td>
+
+                                    <td>
+
+                                        {% if item.status not in ['taken', 'missed'] %}
+
+                                            <form
+                                                method="POST"
+                                                action="{{ url_for('dose_response', schedule_id=item.schedule.id) }}"
+                                                class="d-flex flex-wrap gap-1">
+
+                                                {% if csrf_token is defined %}
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="csrf_token"
+                                                        value="{{ csrf_token() }}">
+
+                                                {% endif %}
+
+                                                <button
+                                                    type="submit"
+                                                    name="status"
+                                                    value="taken"
+                                                    class="btn btn-sm btn-success">
+                                                    ✓ Taken
+                                                </button>
+
+                                                <button
+                                                    type="submit"
+                                                    name="status"
+                                                    value="snoozed"
+                                                    class="btn btn-sm btn-outline-warning">
+                                                    Snooze
+                                                </button>
+
+                                                <button
+                                                    type="submit"
+                                                    name="status"
+                                                    value="missed"
+                                                    class="btn btn-sm btn-outline-danger">
+                                                    Missed
+                                                </button>
+
+                                            </form>
+
+                                        {% else %}
+
+                                            <span class="text-muted small">
+                                                Response recorded
+                                            </span>
+
+                                        {% endif %}
+
+                                    </td>
+
+                                </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            {% else %}
+
+                <div class="text-center py-5">
+
+                    <div class="fs-1 mb-3">
+                        💊
+                    </div>
+
+                    <h5 class="fw-bold">
+                        No medicines scheduled
+                    </h5>
+
+                    <p class="text-muted mb-0">
+                        Add medicines and schedules to get started.
+                    </p>
+
+                </div>
+
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- Reminder Information -->
+    <div class="alert alert-info border-0 rounded-4 p-4">
+
+        <h5 class="fw-bold">
+            🔔 Smart Medicine Reminder
+        </h5>
+
+        <p class="mb-0">
+            Keep this dashboard open and enable notifications
+            to receive reminders. When a reminder appears, choose
+            Taken or Snooze 10 Min to record your response.
+        </p>
+
+    </div>
+
+</div>
+
+<!-- MEDICINE ALARM POPUP -->
+<div
+    id="medicine-alarm-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="alarm-medicine-name">
+
+    <div class="medicine-alarm-card">
+
+        <div class="medicine-alarm-icon">
+            💊
+        </div>
+
+        <h3>
+            Medicine Reminder!
+        </h3>
+
+        <p class="text-muted mb-1">
+            It's time to take your medicine.
+        </p>
+
+        <h4 id="alarm-medicine-name" class="fw-bold mt-3">
+            Medicine
+        </h4>
+
+        <p id="alarm-medicine-dosage" class="mb-1"></p>
+
+        <p id="alarm-medicine-time" class="alarm-time"></p>
+
+        <p id="alarm-medicine-instructions" class="text-muted mb-3"></p>
+
+        <div class="medicine-alarm-actions">
+
+            <button id="alarm-taken" type="button">
+                ✓ I Have Taken It
+            </button>
+
+            <button id="alarm-snooze" type="button">
+                ⏰ Snooze 10 Min
+            </button>
+
+            <button id="alarm-dismiss" type="button">
+                Dismiss
+            </button>
+
+        </div>
+
+        <p id="alarm-message" class="small text-muted mt-3 mb-0"></p>
+
+    </div>
+</div>
+
+<!-- MEDICINE SCHEDULE DATA -->
+<script id="medicine-schedule-data" type="application/json">
+[
+    {% for item in dose_items %}
+        {
+            "schedule_id": {{ item.schedule.id | tojson }},
+            "medicine_id": {{ item.medicine.id | tojson }},
+            "name": {{ item.medicine.name | tojson }},
+            "dosage": {{ item.medicine.dosage | tojson }},
+            "time": {{ item.schedule.scheduled_time | tojson }},
+            "status": {{ item.status | tojson }}
+        }{% if not loop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+<!-- SMART ALARM JAVASCRIPT -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const overlay = document.getElementById("medicine-alarm-overlay");
+    const nameElement = document.getElementById("alarm-medicine-name");
+    const dosageElement = document.getElementById("alarm-medicine-dosage");
+    const timeElement = document.getElementById("alarm-medicine-time");
+    const instructionsElement = document.getElementById("alarm-medicine-instructions");
+    const messageElement = document.getElementById("alarm-message");
+
+    const takenButton = document.getElementById("alarm-taken");
+    const snoozeButton = document.getElementById("alarm-snooze");
+    const dismissButton = document.getElementById("alarm-dismiss");
+
+    const notificationButton = document.getElementById(
+        "dashboard-enable-notifications"
+    );
+
+    let activeAlarm = null;
+    let audioContext = null;
+    let soundTimer = null;
+    let isSaving = false;
+    let pollingTimer = null;
+
+    const SNOOZE_KEY = "medicare_alarm_snoozes";
+    const DISMISSED_KEY = "medicare_alarm_dismissed";
+
+    function getStoredObject(key) {
+        try {
+            return JSON.parse(localStorage.getItem(key) || "{}");
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function saveStoredObject(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+            console.warn("Could not save alarm settings:", error);
+        }
+    }
+
+    function todayKey() {
+        const now = new Date();
+
+        return [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, "0"),
+            String(now.getDate()).padStart(2, "0")
+        ].join("-");
+    }
+
+    function alarmKey(alarm) {
+        return todayKey() + "_" + alarm.schedule_id;
+    }
+
+    /*
+     * Loud repeating alarm using Web Audio.
+     * Actual volume depends on the computer's output volume.
+     */
+    async function prepareAudio() {
+        const AudioContextClass =
+            window.AudioContext || window.webkitAudioContext;
+
+        if (!AudioContextClass) {
+            throw new Error("This browser does not support Web Audio.");
+        }
+
+        if (!audioContext) {
+            audioContext = new AudioContextClass();
+        }
+
+        if (audioContext.state === "suspended") {
+            await audioContext.resume();
+        }
+    }
+
+    function playAlarmTone() {
+        if (!audioContext || audioContext.state !== "running") {
+            return;
+        }
+
+        const startTime = audioContext.currentTime;
+
+        // Three alternating, strong alarm pulses.
+        [880, 1100, 880].forEach(function (frequency, index) {
+
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            const toneStart = startTime + index * 0.32;
+            const toneEnd = toneStart + 0.25;
+
+            oscillator.type = "square";
+
+            oscillator.frequency.setValueAtTime(
+                frequency,
+                toneStart
+            );
+
+            gain.gain.setValueAtTime(0.001, toneStart);
+
+            gain.gain.linearRampToValueAtTime(
+                0.45,
+                toneStart + 0.025
+            );
+
+            gain.gain.setValueAtTime(
+                0.45,
+                toneEnd - 0.04
+            );
+
+            gain.gain.exponentialRampToValueAtTime(
+                0.001,
+                toneEnd
+            );
+
+            oscillator.connect(gain);
+            gain.connect(audioContext.destination);
+
+            oscillator.start(toneStart);
+            oscillator.stop(toneEnd);
+
+        });
+    }
+
+    async function startAlarmSound() {
+        stopAlarmSound();
+
+        try {
+            await prepareAudio();
+
+            playAlarmTone();
+
+            soundTimer = setInterval(function () {
+
+                if (activeAlarm) {
+                    playAlarmTone();
+                }
+
+            }, 1100);
+
+        } catch (error) {
+
+            console.warn("Alarm sound could not start:", error);
+
+            messageElement.textContent =
+                "Click the page once to enable sound, then try again.";
+        }
+    }
+
+    function stopAlarmSound() {
+        if (soundTimer !== null) {
+            clearInterval(soundTimer);
+            soundTimer = null;
+        }
+    }
+
+    function showAlarm(alarm) {
+
+        activeAlarm = alarm;
+        isSaving = false;
+
+        nameElement.textContent =
+            alarm.medicine_name || alarm.name || "Your medicine";
+
+        dosageElement.textContent =
+            "Dosage: " + (alarm.dosage || "Not specified");
+
+        timeElement.textContent =
+            alarm.formatted_time || alarm.scheduled_time || "";
+
+        instructionsElement.textContent =
+            alarm.instructions ||
+            "Follow your prescribed medicine instructions.";
+
+        messageElement.textContent = "";
+
+        takenButton.disabled = false;
+        snoozeButton.disabled = false;
+        dismissButton.disabled = false;
+
+        overlay.classList.add("show");
+
+        startAlarmSound();
+
+        if (
+            "Notification" in window &&
+            Notification.permission === "granted"
+        ) {
+
+            try {
+
+                new Notification("MediCare AI — Medicine Reminder", {
+
+                    body:
+                        (alarm.medicine_name || alarm.name || "Medicine") +
+                        " — " +
+                        (alarm.dosage || "") +
+                        " — " +
+                        (alarm.formatted_time || alarm.scheduled_time || ""),
+
+                    tag: "medicare-" + alarmKey(alarm)
+
+                });
+
+            } catch (error) {
+
+                console.warn("Notification unavailable:", error);
+
+            }
+        }
+    }
+
+    function closeAlarm() {
+
+        stopAlarmSound();
+
+        overlay.classList.remove("show");
+
+        activeAlarm = null;
+        isSaving = false;
+    }
+
+    async function sendResponse(status) {
+
+        if (!activeAlarm || isSaving) {
+            return;
+        }
+
+        isSaving = true;
+
+        takenButton.disabled = true;
+        snoozeButton.disabled = true;
+        dismissButton.disabled = true;
+
+        messageElement.textContent = "Saving your response...";
+
+        try {
+
+            const response = await fetch(
+                "/api/medicine-alarms/" +
+                encodeURIComponent(activeAlarm.schedule_id) +
+                "/response",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        status: status
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+
+                throw new Error(
+                    data.error || "Unable to save the medicine response."
+                );
+            }
+
+            const key = alarmKey(activeAlarm);
+
+            if (status === "snoozed") {
+
+                const snoozes = getStoredObject(SNOOZE_KEY);
+
+                snoozes[key] = Date.now() + 10 * 60 * 1000;
+
+                saveStoredObject(SNOOZE_KEY, snoozes);
+
+                closeAlarm();
+
+            } else if (status === "taken") {
+
+                const dismissed = getStoredObject(DISMISSED_KEY);
+
+                dismissed[key] = true;
+
+                saveStoredObject(DISMISSED_KEY, dismissed);
+
+                closeAlarm();
+
+                window.location.reload();
+            }
+
+        } catch (error) {
+
+            console.error("Medicine response failed:", error);
+
+            messageElement.textContent =
+                error.message + " Please try again.";
+
+            takenButton.disabled = false;
+            snoozeButton.disabled = false;
+            dismissButton.disabled = false;
+
+            isSaving = false;
+        }
+    }
+
+    takenButton.addEventListener("click", function () {
+        sendResponse("taken");
+    });
+
+    snoozeButton.addEventListener("click", function () {
+        sendResponse("snoozed");
+    });
+
+    /*
+     * Dismiss only silences the current popup.
+     * It does not mark the dose as taken or missed.
+     */
+    dismissButton.addEventListener("click", function () {
+
+        if (!activeAlarm) {
+            return;
+        }
+
+        const dismissed = getStoredObject(DISMISSED_KEY);
+
+        dismissed[alarmKey(activeAlarm)] = true;
+
+        saveStoredObject(DISMISSED_KEY, dismissed);
+
+        closeAlarm();
+    });
+
+    if (notificationButton) {
+
+        notificationButton.addEventListener("click", async function () {
+
+            try {
+
+                if (!("Notification" in window)) {
+
+                    alert("This browser does not support notifications.");
+
+                    return;
+                }
+
+                const permission =
+                    await Notification.requestPermission();
+
+                if (permission === "granted") {
+
+                    notificationButton.textContent =
+                        "✓ Notifications Enabled";
+
+                    notificationButton.classList.remove(
+                        "btn-outline-primary"
+                    );
+
+                    notificationButton.classList.add("btn-success");
+
+                    await prepareAudio();
+
+                    new Notification("MediCare AI", {
+
+                        body:
+                            "Medicine reminders are enabled while the dashboard is open."
+
+                    });
+
+                } else {
+
+                    alert(
+                        "Please allow notifications in your browser settings."
+                    );
+                }
+
+            } catch (error) {
+
+                console.error("Notification setup failed:", error);
+
+                alert(
+                    "Notifications or audio could not be enabled. " +
+                    "Please check your browser settings."
+                );
+            }
+        });
+    }
+
+    async function checkMedicineAlarms() {
+
+        if (activeAlarm) {
+            return;
+        }
+
+        try {
+
+            const response = await fetch("/api/medicine-alarms", {
+
+                method: "GET",
+
+                cache: "no-store",
+
+                headers: {
+                    "Accept": "application/json"
+                }
+
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data = await response.json();
+
+            if (!data.success || !Array.isArray(data.alarms)) {
+                return;
+            }
+
+            const now = Date.now();
+
+            const todayPrefix = todayKey() + "_";
+
+            const snoozes = getStoredObject(SNOOZE_KEY);
+
+            const dismissed = getStoredObject(DISMISSED_KEY);
+
+            Object.keys(snoozes).forEach(function (key) {
+
+                if (!key.startsWith(todayPrefix)) {
+                    delete snoozes[key];
+                }
+
+            });
+
+            Object.keys(dismissed).forEach(function (key) {
+
+                if (!key.startsWith(todayPrefix)) {
+                    delete dismissed[key];
+                }
+
+            });
+
+            saveStoredObject(SNOOZE_KEY, snoozes);
+
+            saveStoredObject(DISMISSED_KEY, dismissed);
+
+            const readyAlarm = data.alarms.find(function (alarm) {
+
+                const key = alarmKey(alarm);
+
+                if (dismissed[key]) {
+                    return false;
+                }
+
+                if (snoozes[key] && now < snoozes[key]) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            if (readyAlarm) {
+                showAlarm(readyAlarm);
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "Unable to check medicine alarms:",
+                error
+            );
+        }
+    }
+
+    // Check immediately, then every 15 seconds.
+    checkMedicineAlarms();
+
+    pollingTimer = setInterval(checkMedicineAlarms, 15000);
+
+    // Stop the repeating sound if the page is being unloaded.
+    window.addEventListener("beforeunload", function () {
+
+        stopAlarmSound();
+
+        if (pollingTimer !== null) {
+            clearInterval(pollingTimer);
+        }
+
+    });
+
+});
+</script>
+
+{% endblock %}
