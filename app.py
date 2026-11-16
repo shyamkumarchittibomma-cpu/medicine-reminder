@@ -29,9 +29,16 @@ app.config["SECRET_KEY"] = os.getenv(
 
 # SQLite database path - use absolute path for deployment safety
 _database_url = os.getenv("DATABASE_URL", "sqlite:///medicine.db")
-if _database_url.startswith("sqlite:///") and not _database_url.startswith("sqlite:////"):
-    # Convert relative sqlite path to absolute instance path
-    _db_path = os.path.join(app.instance_path, _database_url.replace("sqlite:///", ""))
+
+# Only normalize relative sqlite paths to absolute instance paths.
+# Keep :memory: and absolute paths (sqlite:////...) untouched.
+if (
+    _database_url.startswith("sqlite:///")
+    and not _database_url.startswith("sqlite:////")
+    and ":memory:" not in _database_url
+):
+    _db_rel = _database_url.replace("sqlite:///", "", 1)
+    _db_path = os.path.join(app.instance_path, _db_rel)
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{_db_path}"
 else:
     app.config["SQLALCHEMY_DATABASE_URI"] = _database_url
@@ -740,7 +747,6 @@ def check_and_send_medicine_reminders():
     with app.app_context():
         now = datetime.now()
         today = now.date().isoformat()
-        window_start = now - timedelta(minutes=2)
 
         schedules = (
             MedicineSchedule.query
@@ -767,11 +773,12 @@ def check_and_send_medicine_reminders():
             dose_datetime = datetime.combine(
                 now.date(), scheduled_time
             )
-            reminder_datetime = dose_datetime - timedelta(minutes=10)
 
-            if not (
-                window_start <= reminder_datetime <= now
-            ):
+            # Skip doses that are more than 10 minutes in the future
+            # or already past the dose window (more than 60 min past).
+            if dose_datetime > now + timedelta(minutes=10):
+                continue
+            if dose_datetime < now - timedelta(minutes=60):
                 continue
 
             event = DoseEvent.query.filter_by(
@@ -1670,7 +1677,6 @@ def caregiver():
 def medicine_alarms():
     now = datetime.now()
     today = now.date().isoformat()
-    current_time = now.strftime("%H:%M")
 
     schedules = (
         MedicineSchedule.query
@@ -1679,7 +1685,6 @@ def medicine_alarms():
             Medicine.user_id == current_user.id,
             Medicine.active.is_(True),
             MedicineSchedule.active.is_(True),
-            MedicineSchedule.scheduled_time <= current_time,
         )
         .all()
     )
