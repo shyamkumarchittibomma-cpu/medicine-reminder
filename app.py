@@ -21,7 +21,14 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
 
-app = Flask(__name__, instance_relative_config=True)
+# Allow the instance folder (SQLite DB + uploads) to be relocated via env.
+# On Render this maps to the persistent disk so data survives redeploy.
+_instance_path = os.getenv("INSTANCE_PATH")
+if _instance_path:
+    os.makedirs(_instance_path, exist_ok=True)
+    app = Flask(__name__, instance_relative_config=True, instance_path=_instance_path)
+else:
+    app = Flask(__name__, instance_relative_config=True)
 
 app.config["SECRET_KEY"] = os.getenv(
     "SECRET_KEY", "dev-only-change-this-key"

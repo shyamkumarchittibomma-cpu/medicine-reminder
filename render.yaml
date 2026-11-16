@@ -31,8 +31,11 @@ services:
     envVars:
       - key: SECRET_KEY
         value: change-this-to-a-long-random-secret-before-deployment
+      - key: INSTANCE_PATH
+        # Persistent disk is mounted at /var/data so DB + uploads survive redeploy.
+        value: /var/data
       - key: DATABASE_URL
-        value: sqlite:///medicine.db
+        value: sqlite:////var/data/medicine.db
       - key: VAPID_PUBLIC_KEY
         value: BBZrkgwuyXI7vLXH_0NU4PVxQONgXN4jTSiIo9_sbP2DdKt-zqLRLZKhjrqjqtbbVe1z0-A2H2hN3sW49VviBqA
       - key: VAPID_PRIVATE_KEY
@@ -46,7 +49,9 @@ services:
       - key: TWILIO_PHONE_NUMBER
         value: "+17372508034"
     
-    # Disk for SQLite database and medical record uploads
+    # Disk for SQLite database and medical record uploads.
+    # The app reads INSTANCE_PATH from the environment; on Render the
+    # instance folder is mapped to this disk so data survives redeploy.
     disk:
       name: data
       mountPath: /var/data
